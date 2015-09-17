@@ -11,14 +11,14 @@
   (update-in m (pop path) dissoc (peek path)))
 
 (defn ev->pos [ev]
-  {:x (.-clientX ev) :y (.-clientY ev)})
+  [(.-clientX ev) (.-clientY ev)])
 
 ;; model
 
 (defonce app-state
-  (atom {:things {0 {:x 0 :y 0 :type :number :value 2}
-                  1 {:x 20 :y 20 :type :number :value 3}
-                  2 {:x 40 :y 40 :type :adder :slots [nil nil]}}}))
+  (atom {:things {0 {:pos [0 0] :type :number :value 2}
+                  1 {:pos [20 20] :type :number :value 3}
+                  2 {:pos [40 40] :type :adder :slots [nil nil]}}}))
 
 (defn get-thing [state id]
   (get-in state [:things id]))
@@ -38,10 +38,10 @@
   (fn [state id] (:type (get-thing state id))))
 
 (defmethod simplify :adder [state id]
-  (let [{:keys [slots x y]} (get-thing state id)
+  (let [{:keys [pos slots]} (get-thing state id)
         [a b] (map (comp :value (partial get-thing state)) slots)]
     (-> (reduce #(dissoc-in %1 [:things %2]) state (conj slots id))
-        (add-thing {:x x :y y :type :number :value (+ a b)}))))
+        (add-thing {:pos pos :type :number :value (+ a b)}))))
 
 (defn maybe-simplify [state id]
   (let [{:keys [slots]} (get-thing state id)]
@@ -57,18 +57,18 @@
 (defn move-thing-to-position [state id pos]
   (-> state
       (remove-thing-from-containing-slot id)
-      (update-in [:things id] merge pos)))
+      (assoc-in [:things id :pos] pos)))
 
 (defn swap-things [state id1 id2]
-  (let [{slot1 :slot, x1 :x, y1 :y} (get-thing state id1)
-        {slot2 :slot, x2 :x, y2 :y} (get-thing state id2)]
+  (let [{slot1 :slot, pos1 :pos} (get-thing state id1)
+        {slot2 :slot, pos2 :pos} (get-thing state id2)]
     (-> state
         (remove-thing-from-containing-slot id1)
         (remove-thing-from-containing-slot id2)
         (cond-> slot1       (put-thing-in-slot id2 slot1)
-                (not slot1) (move-thing-to-position id2 {:x x1 :y y1})
+                (not slot1) (move-thing-to-position id2 pos1)
                 slot2       (put-thing-in-slot id1 slot2)
-                (not slot2) (move-thing-to-position id1 {:x x2 :y y2})))))
+                (not slot2) (move-thing-to-position id1 pos2)))))
 
 (defn handle-click [state kind info]
   (prn kind info state)
@@ -89,8 +89,7 @@
   (render [_]
     (let [id (:id data)
           thing (get-thing data id)
-          x (if (:slot thing) 0 (:x thing))
-          y (if (:slot thing) 0 (:y thing))
+          [x y] (if (:slot thing) [0 0] (:pos thing))
           selected? (= id (:selected data))]
       (dom/div {:class (cond-> "thing number" selected? (str " selected"))
                 :on-click
@@ -104,8 +103,7 @@
   (render [_]
     (let [id (:id data)
           thing (get-thing data id)
-          x (if (:slot thing) 0 (:x thing))
-          y (if (:slot thing) 0 (:y thing))
+          [x y] (if (:slot thing) [0 0] (:pos thing))
           selected? (= id (:selected data))
           [child-id1 child-id2] (:slots thing)]
       (dom/div {:class (cond-> "thing adder" selected? (str " selected"))
