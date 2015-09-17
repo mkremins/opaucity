@@ -23,6 +23,10 @@
 (defn get-thing [state id]
   (get-in state [:things id]))
 
+(defn add-thing [state thing]
+  (let [id (inc (apply max (conj (keys (:things state)) -1)))]
+    (assoc-in state [:things id] thing)))
+
 (defn remove-thing-from-containing-slot [state id]
   (if-let [[parent-id slot] (:slot (get-thing state id))]
     (-> state
@@ -36,8 +40,8 @@
 (defmethod simplify :adder [state id]
   (let [{:keys [slots x y]} (get-thing state id)
         [a b] (map (comp :value (partial get-thing state)) slots)]
-    (-> (reduce #(dissoc-in %1 [:things %2]) state slots)
-        (assoc-in [:things id] {:x x :y y :type :number :value (+ a b)}))))
+    (-> (reduce #(dissoc-in %1 [:things %2]) state (conj slots id))
+        (add-thing {:x x :y y :type :number :value (+ a b)}))))
 
 (defn maybe-simplify [state id]
   (let [{:keys [slots]} (get-thing state id)]
