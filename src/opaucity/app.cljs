@@ -15,11 +15,6 @@
 
 ;; model
 
-(defonce app-state
-  (atom {:things {0 {:pos [0 0] :type :number :value 2}
-                  1 {:pos [20 20] :type :number :value 3}
-                  2 {:pos [40 40] :type :adder :slots [nil nil]}}}))
-
 (defn get-thing [state id]
   (get-in state [:things id]))
 
@@ -37,11 +32,15 @@
 (defmulti simplify
   (fn [state id] (:type (get-thing state id))))
 
-(defmethod simplify :adder [state id]
-  (let [{:keys [pos slots]} (get-thing state id)
-        [a b] (map (comp :value (partial get-thing state)) slots)]
+(def get-binop
+  {"+" + "-" - "*" * "/" /})
+
+(defmethod simplify :binop [state id]
+  (let [{:keys [name pos slots]} (get-thing state id)
+        [a b] (map (comp :value (partial get-thing state)) slots)
+        op (get-binop name)]
     (-> (reduce #(dissoc-in %1 [:things %2]) state (conj slots id))
-        (add-thing {:pos pos :type :number :value (+ a b)}))))
+        (add-thing {:pos pos :type :number :value (op a b)}))))
 
 (defn maybe-simplify [state id]
   (let [{:keys [slots]} (get-thing state id)]
@@ -80,6 +79,18 @@
         (dissoc :selected))
     (cond-> state (= kind :thing) (assoc :selected info))))
 
+;; app state
+
+(def init-things
+  (concat (map #(-> {:pos [(* % 60) 0] :type :number :value %}) (range 5))
+          [{:pos [0 80] :type :binop :name "+" :slots [nil nil]}
+           {:pos [0 160] :type :binop :name "-" :slots [nil nil]}
+           {:pos [0 240] :type :binop :name "*" :slots [nil nil]}
+           {:pos [0 320] :type :binop :name "/" :slots [nil nil]}]))
+
+(defonce app-state
+  (atom (reduce add-thing {:things {}} init-things)))
+
 ;; Om components
 
 (defmulti thing-view
@@ -99,14 +110,14 @@
                 :style {:left (str x "px") :top (str y "px")}}
         (:value thing)))))
 
-(defcomponentmethod thing-view :adder [data owner]
+(defcomponentmethod thing-view :binop [data owner]
   (render [_]
     (let [id (:id data)
           thing (get-thing data id)
           [x y] (if (:slot thing) [0 0] (:pos thing))
           selected? (= id (:selected data))
           [child-id1 child-id2] (:slots thing)]
-      (dom/div {:class (cond-> "thing adder" selected? (str " selected"))
+      (dom/div {:class (cond-> "thing binop" selected? (str " selected"))
                 :on-click
                 (fn [ev]
                   (.stopPropagation ev)
@@ -119,7 +130,7 @@
                     (om/transact! data #(handle-click % :slot [id 0])))}
           (when child-id1
             (om/build thing-view (assoc data :id child-id1))))
-        "+"
+        (:name thing)
         (dom/div {:class "slot"
                   :on-click
                   (fn [ev]
