@@ -79,17 +79,25 @@
         (dissoc :selected))
     (cond-> state (= kind :thing) (assoc :selected info))))
 
+(def levels
+  [; level 0
+   [{:pos [0 0] :type :number :value 2}
+    {:pos [60 0] :type :number :value 2}
+    {:pos [0 60] :type :binop :name "+" :slots [nil nil]}]
+   ; level 1
+   (into (map #(-> {:pos [(* % 60) 0] :type :number :value %}) (range 5))
+         [{:pos [0 60] :type :binop :name "+" :slots [nil nil]}
+          {:pos [0 140] :type :binop :name "-" :slots [nil nil]}
+          {:pos [0 220] :type :binop :name "*" :slots [nil nil]}
+          {:pos [0 300] :type :binop :name "/" :slots [nil nil]}])])
+
+(defn switch-to-level [state level]
+  (reduce add-thing {:things {} :level level} (nth levels level)))
+
 ;; app state
 
-(def init-things
-  (concat (map #(-> {:pos [(* % 60) 0] :type :number :value %}) (range 5))
-          [{:pos [0 80] :type :binop :name "+" :slots [nil nil]}
-           {:pos [0 160] :type :binop :name "-" :slots [nil nil]}
-           {:pos [0 240] :type :binop :name "*" :slots [nil nil]}
-           {:pos [0 320] :type :binop :name "/" :slots [nil nil]}]))
-
 (defonce app-state
-  (atom (reduce add-thing {:things {}} init-things)))
+  (atom (switch-to-level {} 0)))
 
 ;; Om components
 
@@ -139,14 +147,31 @@
           (when child-id2
             (om/build thing-view (assoc data :id child-id2))))))))
 
+(defcomponent level-selector [data owner]
+  (render [_]
+    (dom/div {:class "level-selector"}
+      (dom/span "Level:")
+      (for [level (range (count levels))]
+        (if (= (:level data) level)
+          (dom/strong level)
+          (dom/a {:href "#"
+                  :on-click
+                  (fn [ev]
+                    (.preventDefault ev)
+                    (om/transact! data #(switch-to-level % level)))}
+            level))))))
+
 (defcomponent app [data owner]
   (render [_]
-    (dom/div {:on-click
-              (fn [ev]
-                (.stopPropagation ev)
-                (om/transact! data #(handle-click % :pos (ev->pos ev))))}
-      (for [id (keys (:things data))
-            :when (not (:slot (get-thing data id)))]
-        (om/build thing-view (assoc data :id id))))))
+    (dom/div
+      (om/build level-selector data)
+      (dom/div {:class "board"
+                :on-click
+                (fn [ev]
+                  (.stopPropagation ev)
+                  (om/transact! data #(handle-click % :pos (ev->pos ev))))}
+        (for [id (keys (:things data))
+              :when (not (:slot (get-thing data id)))]
+          (om/build thing-view (assoc data :id id)))))))
 
 (om/root app app-state {:target (js/document.getElementById "app")})
