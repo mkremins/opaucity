@@ -104,40 +104,37 @@
 (defmulti thing-view
   (fn [data _] (:type (get-thing data (:id data)))))
 
-(defcomponentmethod thing-view :number [data owner]
+(defcomponent thing-wrapper [data owner]
   (render [_]
     (let [id (:id data)
           thing (get-thing data id)
           [x y] (if (:slot thing) [0 0] (:pos thing))
           selected? (= id (:selected data))]
-      (dom/div {:class (cond-> "thing number" selected? (str " selected"))
-                :on-click
-                (fn [ev]
-                  (.stopPropagation ev)
-                  (om/transact! data #(handle-click % :thing id)))
+      (dom/div {:class (cond-> (str "thing " (name (:type thing)))
+                               selected? (str " selected"))
+                :on-click (fn [ev]
+                            (.stopPropagation ev)
+                            (om/transact! data #(handle-click % :thing id)))
                 :style {:left (str x "px") :top (str y "px")}}
-        (:value thing)))))
+        (om/build thing-view data)))))
+
+(defcomponentmethod thing-view :number [data owner]
+  (render [_]
+    (dom/span (:value (get-thing data (:id data))))))
 
 (defcomponentmethod thing-view :binop [data owner]
   (render [_]
     (let [id (:id data)
           thing (get-thing data id)
-          [x y] (if (:slot thing) [0 0] (:pos thing))
-          selected? (= id (:selected data))
           [child-id1 child-id2] (:slots thing)]
-      (dom/div {:class (cond-> "thing binop" selected? (str " selected"))
-                :on-click
-                (fn [ev]
-                  (.stopPropagation ev)
-                  (om/transact! data #(handle-click % :thing id)))
-                :style {:left (str x "px") :top (str y "px")}}
+      (dom/div
         (dom/div {:class "slot"
                   :on-click
                   (fn [ev]
                     (.stopPropagation ev)
                     (om/transact! data #(handle-click % :slot [id 0])))}
           (when child-id1
-            (om/build thing-view (assoc data :id child-id1))))
+            (om/build thing-wrapper (assoc data :id child-id1))))
         (:name thing)
         (dom/div {:class "slot"
                   :on-click
@@ -145,7 +142,7 @@
                     (.stopPropagation ev)
                     (om/transact! data #(handle-click % :slot [id 1])))}
           (when child-id2
-            (om/build thing-view (assoc data :id child-id2))))))))
+            (om/build thing-wrapper (assoc data :id child-id2))))))))
 
 (defcomponent level-selector [data owner]
   (render [_]
@@ -172,6 +169,6 @@
                   (om/transact! data #(handle-click % :pos (ev->pos ev))))}
         (for [id (keys (:things data))
               :when (not (:slot (get-thing data id)))]
-          (om/build thing-view (assoc data :id id)))))))
+          (om/build thing-wrapper (assoc data :id id)))))))
 
 (om/root app app-state {:target (js/document.getElementById "app")})
