@@ -47,11 +47,13 @@
     (cond-> state (and slots (every? identity slots)) (simplify id))))
 
 (defn put-thing-in-slot [state id [parent-id slot]]
-  (-> state
-      (remove-thing-from-containing-slot id)
-      (assoc-in [:things parent-id :slots slot] id)
-      (assoc-in [:things id :slot] [parent-id slot])
-      (maybe-simplify parent-id)))
+  (if (= id parent-id)
+    state ; don't let the user put a thing into one of its own slots
+    (-> state
+        (remove-thing-from-containing-slot id)
+        (assoc-in [:things parent-id :slots slot] id)
+        (assoc-in [:things id :slot] [parent-id slot])
+        (maybe-simplify parent-id))))
 
 (defn move-thing-to-position [state id pos]
   (-> state
