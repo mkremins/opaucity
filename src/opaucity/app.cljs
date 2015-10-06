@@ -18,6 +18,11 @@
 (defn get-thing [state id]
   (get-in state [:things id]))
 
+(defn get-the-thing
+  "Gets the thing to render. For use by Om components that represent things."
+  [state]
+  (get-thing state (:id state)))
+
 (defn add-thing [state thing]
   (let [id (inc (apply max (conj (keys (:things state)) -1)))]
     (assoc-in state [:things id] thing)))
@@ -124,44 +129,33 @@
                 :style {:left (str x "px") :top (str y "px")}}
         (om/build thing-view data)))))
 
+(defcomponent slot-view [data owner]
+  (render [_]
+    (let [{:keys [id slot-id]} data]
+      (dom/div {:class "slot"
+                :on-click (fn [ev]
+                            (.stopPropagation ev)
+                            (om/transact! data #(handle-click % :slot [id slot-id])))}
+        (when-let [child-id (get-in (get-thing data id) [:slots slot-id])]
+          (om/build thing-wrapper (assoc data :id child-id)))))))
+
 (defcomponentmethod thing-view :number [data owner]
   (render [_]
-    (dom/span (:value (get-thing data (:id data))))))
+    (dom/span (:value (get-the-thing data)))))
 
 (defcomponentmethod thing-view :goal [data owner]
   (render [_]
-    (let [id (:id data)
-          thing (get-thing data id)]
-      (dom/div
-        (dom/p {:class "explanation"}
-          "Give me " (dom/code (pr-str (:value thing))) "!")
-        (dom/div {:class "slot"
-                  :on-click
-                  (fn [ev]
-                    (.stopPropagation ev)
-                    (om/transact! data #(handle-click % :slot [id 0])))})))))
+    (dom/div
+      (dom/p {:class "explanation"}
+        "Give me " (dom/code (pr-str (:value (get-the-thing data)))) "!")
+      (om/build slot-view (assoc data :slot-id 0)))))
 
 (defcomponentmethod thing-view :binop [data owner]
   (render [_]
-    (let [id (:id data)
-          thing (get-thing data id)
-          [child-id1 child-id2] (:slots thing)]
-      (dom/div
-        (dom/div {:class "slot"
-                  :on-click
-                  (fn [ev]
-                    (.stopPropagation ev)
-                    (om/transact! data #(handle-click % :slot [id 0])))}
-          (when child-id1
-            (om/build thing-wrapper (assoc data :id child-id1))))
-        (:name thing)
-        (dom/div {:class "slot"
-                  :on-click
-                  (fn [ev]
-                    (.stopPropagation ev)
-                    (om/transact! data #(handle-click % :slot [id 1])))}
-          (when child-id2
-            (om/build thing-wrapper (assoc data :id child-id2))))))))
+    (dom/div
+      (om/build slot-view (assoc data :slot-id 0))
+      (:name (get-the-thing data))
+      (om/build slot-view (assoc data :slot-id 1)))))
 
 (defcomponent level-selector [data owner]
   (render [_]
