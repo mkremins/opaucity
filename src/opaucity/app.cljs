@@ -83,7 +83,8 @@
   [; level 0
    [{:pos [0 0] :type :number :value 2}
     {:pos [60 0] :type :number :value 2}
-    {:pos [0 60] :type :binop :name "+" :slots [nil nil]}]
+    {:pos [0 60] :type :binop :name "+" :slots [nil nil]}
+    {:pos [200 0] :type :goal :value 4 :slots [nil]}]
    ; level 1
    (into (map #(-> {:pos [(* % 60) 0] :type :number :value %}) (range 5))
          [{:pos [0 60] :type :binop :name "+" :slots [nil nil]}
@@ -93,6 +94,9 @@
 
 (defn switch-to-level [state level]
   (reduce add-thing {:things {} :level level} (nth levels level)))
+
+(defmethod simplify :goal [state id]
+  (switch-to-level state (inc (:level state))))
 
 ;; app state
 
@@ -121,6 +125,19 @@
 (defcomponentmethod thing-view :number [data owner]
   (render [_]
     (dom/span (:value (get-thing data (:id data))))))
+
+(defcomponentmethod thing-view :goal [data owner]
+  (render [_]
+    (let [id (:id data)
+          thing (get-thing data id)]
+      (dom/div
+        (dom/p {:class "explanation"}
+          "Give me " (dom/code (pr-str (:value thing))) "!")
+        (dom/div {:class "slot"
+                  :on-click
+                  (fn [ev]
+                    (.stopPropagation ev)
+                    (om/transact! data #(handle-click % :slot [id 0])))})))))
 
 (defcomponentmethod thing-view :binop [data owner]
   (render [_]
