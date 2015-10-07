@@ -174,23 +174,25 @@
         (if (= (:level data) level)
           (dom/strong level)
           (dom/a {:href "#"
-                  :on-click
-                  (fn [ev]
-                    (.preventDefault ev)
-                    (om/transact! data #(switch-to-level % level)))}
+                  :on-click (fn [ev]
+                              (.preventDefault ev)
+                              (om/transact! data #(switch-to-level % level)))}
             level))))))
+
+(defcomponent board-view [data owner]
+  (render [_]
+    (dom/div {:class "board"
+              :on-click (fn [ev]
+                          (.stopPropagation ev)
+                          (om/transact! data #(handle-click % :pos (ev->pos ev))))}
+      (for [id (keys (:things data))
+            :when (not (:slot (get-thing data id)))]
+        (om/build thing-wrapper (assoc data :id id))))))
 
 (defcomponent app [data owner]
   (render [_]
     (dom/div
       (om/build level-selector data)
-      (dom/div {:class "board"
-                :on-click
-                (fn [ev]
-                  (.stopPropagation ev)
-                  (om/transact! data #(handle-click % :pos (ev->pos ev))))}
-        (for [id (keys (:things data))
-              :when (not (:slot (get-thing data id)))]
-          (om/build thing-wrapper (assoc data :id id)))))))
+      (om/build board-view data))))
 
 (om/root app app-state {:target (js/document.getElementById "app")})
