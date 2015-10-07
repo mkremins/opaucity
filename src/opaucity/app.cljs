@@ -51,14 +51,22 @@
   (let [{:keys [slots]} (get-thing state id)]
     (cond-> state (and slots (every? identity slots)) (simplify id))))
 
+(defn can-put-thing-in-slot? [state id [parent-id slot]]
+  (and (not (= id parent-id)) ; can't put a thing into one of its own slots
+       (let [thing (get-thing state id)
+             parent (get-thing state parent-id)]
+         (case (:type parent)
+           :binop (= (:type thing) :number)
+           :goal (= (:value thing) (:value parent))))))
+
 (defn put-thing-in-slot [state id [parent-id slot]]
-  (if (= id parent-id)
-    state ; don't let the user put a thing into one of its own slots
+  (if (can-put-thing-in-slot? state id [parent-id slot])
     (-> state
         (remove-thing-from-containing-slot id)
         (assoc-in [:things parent-id :slots slot] id)
         (assoc-in [:things id :slot] [parent-id slot])
-        (maybe-simplify parent-id))))
+        (maybe-simplify parent-id))
+    state))
 
 (defn move-thing-to-position [state id pos]
   (-> state
