@@ -52,7 +52,7 @@
     (cond-> state (and slots (every? identity slots)) (simplify id))))
 
 (defn can-put-thing-in-slot? [state id [parent-id slot]]
-  (and (not (= id parent-id)) ; can't put a thing into one of its own slots
+  (and (not= id parent-id) ; can't put a thing into one of its own slots
        (let [thing (get-thing state id)
              parent (get-thing state parent-id)]
          (case (:type parent)
@@ -139,8 +139,9 @@
 
 (defcomponent slot-view [data owner]
   (render [_]
-    (let [{:keys [id slot-id]} data]
-      (dom/div {:class "slot"
+    (let [{:keys [id slot-id selected]} data
+          valid-target? (can-put-thing-in-slot? data selected [id slot-id])]
+      (dom/div {:class (cond-> "slot" valid-target? (str " valid-target"))
                 :on-click (fn [ev]
                             (.stopPropagation ev)
                             (om/transact! data #(handle-click % :slot [id slot-id])))}
